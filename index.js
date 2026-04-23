@@ -216,6 +216,67 @@ bot.on("document", async (ctx) => {
   }
 });
 
+// 5. Fitur Voice to Summary (Merangkum Pesan Suara)
+bot.on("voice", async (ctx) => {
+  const voice = ctx.message.voice;
+
+  // Batasi durasi jika perlu (misal max 2 menit agar tidak overload)
+  if (voice.duration > 120) {
+    return ctx.reply(
+      "❌ Durasi voice note terlalu panjang. Maksimal 2 menit ya.",
+    );
+  }
+
+  const loadingMsg = await ctx.reply(
+    "🎤 Mendengarkan dan merangkum pesan suara Anda...",
+  );
+
+  try {
+    // 1. Dapatkan link file dari Telegram
+    const fileLink = await ctx.telegram.getFileLink(voice.file_id);
+    const url = typeof fileLink === "string" ? fileLink : fileLink.href;
+
+    // 2. Download file voice (.ogg)
+    const response = await axios.get(url, { responseType: "arraybuffer" });
+    const voiceBuffer = Buffer.from(response.data);
+    const voiceBase64 = voiceBuffer.toString("base64");
+
+    // 3. Gunakan Gemini untuk Merangkum
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    // PERUBAHAN PENTING: Prompt diubah untuk meminta rangkuman
+    const prompt = `Tolong dengarkan pesan suara ini dan buatkan rangkuman intinya dalam Bahasa Indonesia. 
+Jika pesan suaranya panjang, ambil poin-poin utamanya saja.
+PENTING: JANGAN gunakan format markdown seperti bintang ganda (**) atau tagar (#). Gunakan teks biasa saja.`;
+
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          data: voiceBase64,
+          mimeType: "audio/ogg",
+        },
+      },
+    ]);
+
+    const summary = result.response.text();
+    const formattedResponse = `📝 RANGKUMAN PESAN SUARA:\n\n${summary}`;
+
+    // 4. Kirim hasil rangkuman
+    await sendLongMessage(ctx, loadingMsg.message_id, formattedResponse);
+  } catch (error) {
+    console.error("Error Processing Voice:", error);
+    await ctx.telegram
+      .editMessageText(
+        ctx.chat.id,
+        loadingMsg.message_id,
+        undefined,
+        "❌ Gagal merangkum pesan suara. Pastikan suara terdengar jelas atau durasinya tidak terlalu pendek.",
+      )
+      .catch(() => {});
+  }
+});
+
 bot.launch().then(() => console.log("🚀 Bot Telegram FIKSP Aktif!"));
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
