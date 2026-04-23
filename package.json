@@ -1,0 +1,21 @@
+{
+  "name": "bot-excel-tele",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.15.0",
+    "dotenv": "^17.4.2",
+    "pdfreader": "^3.0.8",
+    "telegraf": "^4.16.3",
+    "xlsx": "^0.18.5"
+  }
+}
