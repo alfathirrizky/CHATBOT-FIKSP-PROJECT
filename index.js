@@ -200,7 +200,7 @@ bot.on("document", async (ctx) => {
     ]);
 
     const summary = result.response.text();
-    const formattedSummary = `📝 RANGKUMAN CERDAS PDF (${document.file_name}):\n\n${summary}`;
+    const formattedSummary = `📝 RANGKUMAN PDF (${document.file_name}):\n\n${summary}`;
 
     await sendLongMessage(ctx, loadingMsg.message_id, formattedSummary);
   } catch (error) {
