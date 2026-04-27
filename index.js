@@ -66,7 +66,7 @@ bot.command("tanya", async (ctx) => {
 
   if (!question) {
     return ctx.reply(
-      "❌ Mohon sertakan pertanyaan.\nContoh: /tanya Apa alasan penggunaan QRIS Tap menurun?",
+      "Mohon sertakan pertanyaan.\nContoh: /tanya Apa alasan penggunaan QRIS Tap menurun?",
     );
   }
 
@@ -77,13 +77,11 @@ bot.command("tanya", async (ctx) => {
   );
 
   if (!fs.existsSync(localPdfPath)) {
-    return ctx.reply(
-      "❌ File PDF Nota Dinas tidak ditemukan di folder project.",
-    );
+    return ctx.reply("File PDF Nota Dinas tidak ditemukan di folder project.");
   }
 
   const loadingMsg = await ctx.reply(
-    "🔍 Membaca Nota Dinas untuk mencari jawaban...",
+    "Membaca Nota Dinas untuk mencari jawaban...",
   );
 
   try {
@@ -105,7 +103,7 @@ Berdasarkan dokumen Laporan Monitoring Tindak Lanjut HLM TP2DD Tahun 2025 ini, t
     ]);
 
     const answer = result.response.text();
-    const formattedAnswer = `📚 JAWABAN DARI DOKUMEN TP2DD:\n\n${answer}`;
+    const formattedAnswer = `JAWABAN DARI DOKUMEN TP2DD:\n\n${answer}`;
 
     await sendLongMessage(ctx, loadingMsg.message_id, formattedAnswer);
   } catch (error) {
@@ -115,7 +113,7 @@ Berdasarkan dokumen Laporan Monitoring Tindak Lanjut HLM TP2DD Tahun 2025 ini, t
         ctx.chat.id,
         loadingMsg.message_id,
         undefined,
-        "❌ Gagal mencari jawaban di dokumen internal.",
+        "Gagal mencari jawaban di dokumen internal.",
       )
       .catch(() => {});
   }
@@ -134,7 +132,7 @@ bot.on("text", async (ctx) => {
 
   const data = readExcelData();
   if (data.length === 0)
-    return ctx.reply("❌ Database sedang kosong atau file tidak terbaca.");
+    return ctx.reply("Database sedang kosong atau file tidak terbaca.");
 
   const results = data.filter((row) =>
     Object.values(row).some((val) =>
@@ -145,7 +143,7 @@ bot.on("text", async (ctx) => {
   if (results.length > 0) {
     const limitedResults = results.slice(0, 5);
     for (const item of limitedResults) {
-      let message = `✅ *Data Ditemukan:*\n───────────────────\n`;
+      let message = `*Data Ditemukan:*\n───────────────────\n`;
       for (const [key, value] of Object.entries(item)) {
         message += `*${key}*: \`${value}\`\n`;
       }
@@ -153,7 +151,7 @@ bot.on("text", async (ctx) => {
     }
     if (results.length > 5) {
       ctx.reply(
-        `⚠️ Ada ${results.length - 5} data lain. Mohon ketik kata kunci lebih spesifik.`,
+        `Ada ${results.length - 5} data lain. Mohon ketik kata kunci lebih spesifik.`,
       );
     }
   } else {
@@ -168,13 +166,13 @@ bot.on("document", async (ctx) => {
   const document = ctx.message.document;
 
   if (document.mime_type !== "application/pdf") {
-    return ctx.reply("❌ Mohon kirimkan file dengan format PDF.");
+    return ctx.reply("Mohon kirimkan file dengan format PDF.");
   }
   if (document.file_size > 15 * 1024 * 1024) {
-    return ctx.reply("❌ Ukuran PDF terlalu besar. Maksimal 15MB ya.");
+    return ctx.reply("Ukuran PDF terlalu besar. Maksimal 15MB ya.");
   }
 
-  const loadingMsg = await ctx.reply("📄 Sedang mengunduh dokumen PDF...");
+  const loadingMsg = await ctx.reply("Sedang mengunduh dokumen PDF...");
 
   try {
     const fileLink = await ctx.telegram.getFileLink(document.file_id);
@@ -187,7 +185,7 @@ bot.on("document", async (ctx) => {
       ctx.chat.id,
       loadingMsg.message_id,
       undefined,
-      "🤖 Membaca isi dokumen dan merangkum menggunakan AI...",
+      "Membaca isi dokumen dan merangkum menggunakan AI...",
     );
 
     const pdfBase64 = pdfBuffer.toString("base64");
@@ -200,7 +198,7 @@ bot.on("document", async (ctx) => {
     ]);
 
     const summary = result.response.text();
-    const formattedSummary = `📝 RANGKUMAN PDF (${document.file_name}):\n\n${summary}`;
+    const formattedSummary = `RANGKUMAN PDF (${document.file_name}):\n\n${summary}`;
 
     await sendLongMessage(ctx, loadingMsg.message_id, formattedSummary);
   } catch (error) {
@@ -210,7 +208,7 @@ bot.on("document", async (ctx) => {
         ctx.chat.id,
         loadingMsg.message_id,
         undefined,
-        "❌ Terjadi kendala teknis saat memproses file PDF.",
+        "Terjadi kendala teknis saat memproses file PDF.",
       )
       .catch(() => {});
   }
@@ -222,13 +220,11 @@ bot.on("voice", async (ctx) => {
 
   // Batasi durasi jika perlu (misal max 2 menit agar tidak overload)
   if (voice.duration > 120) {
-    return ctx.reply(
-      "❌ Durasi voice note terlalu panjang. Maksimal 2 menit ya.",
-    );
+    return ctx.reply("Durasi voice note terlalu panjang. Maksimal 2 menit ya.");
   }
 
   const loadingMsg = await ctx.reply(
-    "🎤 Mendengarkan dan merangkum pesan suara Anda...",
+    "Mendengarkan dan merangkum pesan suara Anda...",
   );
 
   try {
@@ -260,7 +256,7 @@ PENTING: JANGAN gunakan format markdown seperti bintang ganda (**) atau tagar (#
     ]);
 
     const summary = result.response.text();
-    const formattedResponse = `📝 RANGKUMAN PESAN SUARA:\n\n${summary}`;
+    const formattedResponse = `RANGKUMAN PESAN SUARA:\n\n${summary}`;
 
     // 4. Kirim hasil rangkuman
     await sendLongMessage(ctx, loadingMsg.message_id, formattedResponse);
@@ -271,7 +267,7 @@ PENTING: JANGAN gunakan format markdown seperti bintang ganda (**) atau tagar (#
         ctx.chat.id,
         loadingMsg.message_id,
         undefined,
-        "❌ Gagal merangkum pesan suara. Pastikan suara terdengar jelas atau durasinya tidak terlalu pendek.",
+        "Gagal merangkum pesan suara. Pastikan suara terdengar jelas atau durasinya tidak terlalu pendek.",
       )
       .catch(() => {});
   }

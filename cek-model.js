@@ -5,18 +5,18 @@ async function checkModels() {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    console.log("❌ API Key tidak ditemukan. Pastikan ada di file .env");
+    console.log("API Key tidak ditemukan. Pastikan ada di file .env");
     return;
   }
 
-  console.log("⏳ Sedang mengecek daftar model ke server Google...\n");
+  console.log("Sedang mengecek daftar model ke server Google...\n");
 
   try {
     const response = await axios.get(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
     );
 
-    console.log("✅ Model yang BISA kamu gunakan untuk generateContent:");
+    console.log("Model yang BISA kamu gunakan untuk generateContent:");
     console.log("──────────────────────────────────────────────────");
 
     // Filter model yang mendukung generateContent
@@ -30,7 +30,7 @@ async function checkModels() {
     });
   } catch (error) {
     console.error(
-      "❌ Gagal mengambil data:",
+      "Gagal mengambil data:",
       error.response?.data?.error?.message || error.message,
     );
   }
