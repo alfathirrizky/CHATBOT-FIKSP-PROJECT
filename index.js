@@ -13,7 +13,9 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Fungsi membaca Excel/CSV
 function readExcelData() {
   try {
-    const workbook = xlsx.readFile(path.join(__dirname, process.env.FILE_PATH));
+    // Pastikan membaca dari folder database
+    const filePath = path.join(__dirname, "database", path.basename(process.env.FILE_PATH));
+    const workbook = xlsx.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     return xlsx.utils.sheet_to_json(sheet);
@@ -68,16 +70,17 @@ bot.command("tanya", async (ctx) => {
       "Mohon sertakan pertanyaan.\nContoh: /tanya Apa alasan penggunaan QRIS Tap menurun?",
     );
   }
-  // Nama file PDF disesuaikan dengan file Nota Dinas
+  // Nama file PDF disesuaikan dengan file Nota Dinas dan diambil dari folder database
   const localPdfPath = path.join(
     __dirname,
+    "database",
     "20260410_ND_BIRO PERKEU  KE ASPERKEU_LAP MONITORING TL REKOMENDASI HLM TP2DD TAHUN 2025.pdf",
   );
   if (!fs.existsSync(localPdfPath)) {
     return ctx.reply("File PDF Nota Dinas tidak ditemukan di folder project.");
   }
   const loadingMsg = await ctx.reply(
-    "Membaca Nota Dinas untuk mencari jawaban...",
+    "Membaca Dokumen untuk mencari jawaban...",
   );
   try {
     const pdfBuffer = fs.readFileSync(localPdfPath);
