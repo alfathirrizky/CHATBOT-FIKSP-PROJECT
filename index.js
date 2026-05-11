@@ -6,6 +6,7 @@ const axios = require("axios");
 const fs = require("fs");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { YoutubeTranscript } = require("youtube-transcript");
+const schedule = require("node-schedule");
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -49,6 +50,67 @@ async function sendLongMessage(ctx, loadingMsgId, fullText) {
     }
   }
 }
+
+const schedulesPath = path.join(__dirname, "database", "schedules.json");
+
+// Helper untuk membaca dan menyimpan jadwal
+function loadSchedules() {
+  if (fs.existsSync(schedulesPath)) {
+    try {
+      const data = fs.readFileSync(schedulesPath, 'utf8');
+      return JSON.parse(data);
+    } catch (err) {
+      console.error("Gagal membaca jadwal:", err);
+      return [];
+    }
+  }
+  return [];
+}
+
+function saveSchedules(schedules) {
+  fs.writeFileSync(schedulesPath, JSON.stringify(schedules, null, 2), 'utf8');
+}
+
+// Global state untuk menyimpan job id
+let scheduleJobs = {};
+
+function scheduleReminder(ctx, scheduleData) {
+  const { id, dateStr, message, chatId } = scheduleData;
+  const dateObj = new Date(dateStr);
+  
+  if (dateObj < new Date()) return;
+  
+  const job = schedule.scheduleJob(dateObj, async function() {
+    try {
+      await bot.telegram.sendMessage(chatId, `⏰ *PENGINGAT JADWAL* ⏰\n\nKegiatan: ${message}`, { parse_mode: "Markdown" });
+      
+      let schedules = loadSchedules();
+      schedules = schedules.filter(s => s.id !== id);
+      saveSchedules(schedules);
+      delete scheduleJobs[id];
+    } catch (err) {
+      console.error("Gagal mengirim pengingat:", err);
+    }
+  });
+  
+  if (job) {
+    scheduleJobs[id] = job;
+  }
+}
+
+function initSchedules() {
+  const schedules = loadSchedules();
+  const validSchedules = [];
+  schedules.forEach(s => {
+    if (new Date(s.dateStr) >= new Date()) {
+      scheduleReminder(null, s);
+      validSchedules.push(s);
+    }
+  });
+  saveSchedules(validSchedules);
+}
+initSchedules();
+
 // 1. Welcome Message
 bot.start((ctx) => {
   ctx.replyWithMarkdown(
@@ -59,7 +121,9 @@ bot.start((ctx) => {
       `2. Ketik /tanya [pertanyaan] untuk mencari info dari dokumen Laporan Monitoring HLM TP2DD Tahun 2025.\n` +
       `3. Kirim file PDF baru untuk dirangkum otomatis.\n` +
       `4. Kirim link YouTube untuk merangkum isi video.\n` +
-      `5. Kirim pesan suara (voice) atau file audio untuk merangkum isinya.`,
+      `5. Kirim pesan suara (voice) atau file audio untuk merangkum isinya.\n` +
+      `6. Ketik /jadwal [YYYY-MM-DD HH:MM] [Kegiatan] untuk membuat pengingat jadwal.\n` +
+      `7. Ketik /listjadwal untuk melihat daftar jadwal Anda.`
   );
 });
 // 2. Fitur Tanya Jawab Dokumen PDF Lokal (Sesuai PDF yang dikirim)
@@ -112,6 +176,65 @@ Berdasarkan dokumen Laporan Monitoring Tindak Lanjut HLM TP2DD Tahun 2025 ini, t
       .catch(() => {});
   }
 });
+
+// Fitur Pencatat dan Pengingat Jadwal
+bot.command('jadwal', (ctx) => {
+  const input = ctx.message.text.replace('/jadwal', '').trim();
+  if (!input) {
+    return ctx.reply("Format salah. Gunakan: /jadwal YYYY-MM-DD HH:MM [Kegiatan]\nContoh: /jadwal 2026-05-12 14:00 Rapat Tim");
+  }
+  
+  const parts = input.split(' ');
+  if (parts.length < 3) {
+    return ctx.reply("Format salah. Gunakan: /jadwal YYYY-MM-DD HH:MM [Kegiatan]\nContoh: /jadwal 2026-05-12 14:00 Rapat Tim");
+  }
+  
+  const datePart = parts[0];
+  const timePart = parts[1];
+  const messagePart = parts.slice(2).join(' ');
+  
+  const dateStr = `${datePart}T${timePart}:00+07:00`; // Asumsi timezone WIB
+  const dateObj = new Date(dateStr);
+  
+  if (isNaN(dateObj.getTime())) {
+    return ctx.reply("Format tanggal/waktu tidak valid. Pastikan menggunakan YYYY-MM-DD HH:MM");
+  }
+  
+  if (dateObj < new Date()) {
+    return ctx.reply("Waktu tidak boleh di masa lalu!");
+  }
+  
+  const newSchedule = {
+    id: Date.now().toString(),
+    dateStr: dateObj.toISOString(),
+    displayDate: `${datePart} ${timePart}`,
+    message: messagePart,
+    chatId: ctx.chat.id
+  };
+  
+  const schedules = loadSchedules();
+  schedules.push(newSchedule);
+  saveSchedules(schedules);
+  
+  scheduleReminder(ctx, newSchedule);
+  
+  ctx.reply(`✅ Jadwal berhasil dicatat!\n\n📅 Waktu: ${newSchedule.displayDate}\n📝 Kegiatan: ${newSchedule.message}\n\nSaya akan mengingatkan Anda saat waktunya tiba.`);
+});
+
+bot.command('listjadwal', (ctx) => {
+  const schedules = loadSchedules().filter(s => s.chatId === ctx.chat.id);
+  if (schedules.length === 0) {
+    return ctx.reply("Anda belum memiliki jadwal kegiatan yang tercatat.");
+  }
+  
+  let msg = "📋 *DAFTAR JADWAL KEGIATAN*\n\n";
+  schedules.forEach((s, i) => {
+    msg += `${i+1}. ${s.displayDate} - ${s.message}\n`;
+  });
+  
+  ctx.replyWithMarkdown(msg);
+});
+
 // 3. Logika Pencarian Excel (Text Search) dan YouTube Link
 bot.on("text", async (ctx) => {
   const text = ctx.message.text.trim();
