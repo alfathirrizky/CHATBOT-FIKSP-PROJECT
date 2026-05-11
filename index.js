@@ -82,7 +82,14 @@ function scheduleReminder(ctx, scheduleData) {
   
   const job = schedule.scheduleJob(dateObj, async function() {
     try {
-      await bot.telegram.sendMessage(chatId, `⏰ *PENGINGAT JADWAL* ⏰\n\nKegiatan: ${message}`, { parse_mode: "Markdown" });
+      const urlRegex = /(https?:\/\/[^\s]+)/;
+      const match = message.match(urlRegex);
+      const keyboard = match ? { inline_keyboard: [[{ text: "🔗 Buka Tautan (Zoom/Meet)", url: match[0] }]] } : undefined;
+
+      await bot.telegram.sendMessage(chatId, `⏰ *PENGINGAT JADWAL* ⏰\n\nKegiatan: ${message}`, { 
+        parse_mode: "Markdown",
+        reply_markup: keyboard
+      });
       
       let schedules = loadSchedules();
       schedules = schedules.filter(s => s.id !== id);
@@ -177,16 +184,29 @@ Berdasarkan dokumen Laporan Monitoring Tindak Lanjut HLM TP2DD Tahun 2025 ini, t
   }
 });
 
+function formatGoogleCalendarDate(dateObj) {
+  return dateObj.toISOString().replace(/-|:/g, '').split('.')[0] + 'Z';
+}
+
+function getGoogleCalendarLink(title, dateObj) {
+  const startDate = formatGoogleCalendarDate(dateObj);
+  const endDateObj = new Date(dateObj.getTime() + 60 * 60 * 1000); // 1 jam setelahnya
+  const endDate = formatGoogleCalendarDate(endDateObj);
+  
+  const text = encodeURIComponent(title);
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${startDate}/${endDate}`;
+}
+
 // Fitur Pencatat dan Pengingat Jadwal
 bot.command('jadwal', (ctx) => {
   const input = ctx.message.text.replace('/jadwal', '').trim();
   if (!input) {
-    return ctx.reply("Format salah. Gunakan: /jadwal YYYY-MM-DD HH:MM [Kegiatan]\nContoh: /jadwal 2026-05-12 14:00 Rapat Tim");
+    return ctx.reply("Format salah. Gunakan: /jadwal YYYY-MM-DD HH:MM [Kegiatan]\nContoh: /jadwal 2026-05-12 14:00 Rapat Tim https://zoom.us/j/123...");
   }
   
   const parts = input.split(' ');
   if (parts.length < 3) {
-    return ctx.reply("Format salah. Gunakan: /jadwal YYYY-MM-DD HH:MM [Kegiatan]\nContoh: /jadwal 2026-05-12 14:00 Rapat Tim");
+    return ctx.reply("Format salah. Gunakan: /jadwal YYYY-MM-DD HH:MM [Kegiatan]\nContoh: /jadwal 2026-05-12 14:00 Rapat Tim https://zoom.us/j/123...");
   }
   
   const datePart = parts[0];
@@ -218,7 +238,15 @@ bot.command('jadwal', (ctx) => {
   
   scheduleReminder(ctx, newSchedule);
   
-  ctx.reply(`✅ Jadwal berhasil dicatat!\n\n📅 Waktu: ${newSchedule.displayDate}\n📝 Kegiatan: ${newSchedule.message}\n\nSaya akan mengingatkan Anda saat waktunya tiba.`);
+  const gcalLink = getGoogleCalendarLink(newSchedule.message, dateObj);
+  
+  ctx.reply(`✅ Jadwal berhasil dicatat!\n\n📅 Waktu: ${newSchedule.displayDate}\n📝 Kegiatan: ${newSchedule.message}\n\nSaya akan mengingatkan Anda saat waktunya tiba.`, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "📅 Tambahkan ke Kalender", url: gcalLink }]
+      ]
+    }
+  });
 });
 
 bot.command('listjadwal', (ctx) => {

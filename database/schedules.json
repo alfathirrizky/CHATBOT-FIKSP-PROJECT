@@ -14,10 +14,17 @@
     "chatId": 1234921774
   },
   {
-    "id": "1778481378116",
-    "dateStr": "2026-05-11T06:40:00.000Z",
-    "displayDate": "2026-05-11 13:40",
-    "message": "Rapat koordinasi tim",
+    "id": "1778482484163",
+    "dateStr": "2026-05-12T02:30:00.000Z",
+    "displayDate": "2026-05-12 09:30",
+    "message": "- Rapat triwulan",
+    "chatId": 1234921774
+  },
+  {
+    "id": "1778482706820",
+    "dateStr": "2026-05-12T07:00:00.000Z",
+    "displayDate": "2026-05-12 14:00",
+    "message": "Rapat Tim https://zoom.us/j/123456789",
     "chatId": 1234921774
   }
 ]
