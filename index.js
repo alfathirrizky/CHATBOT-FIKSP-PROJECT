@@ -147,7 +147,7 @@ bot.on("text", async (ctx) => {
     return;
   }
 
-  const greetings = ["hi", "halo", "pagi", "siang", "sore", "tes", "p"];
+  const greetings = ["hi", "halo", "pagi", "siang", "sore", "malam", "tes", "p"];
   if (greetings.includes(keyword)) {
     return ctx.reply(
       `Halo ${ctx.from.first_name}, mau cari data apa hari ini?`,
@@ -219,7 +219,7 @@ bot.on("document", async (ctx) => {
         ctx.chat.id,
         loadingMsg.message_id,
         undefined,
-        "Terjadi kendala teknis saat memproses file PDF.",
+        "Terjadi kendala teknis saat memproses file PDF 😅",
       )
       .catch(() => {});
   }
@@ -229,7 +229,7 @@ bot.on(["voice", "audio"], async (ctx) => {
   const audioFile = ctx.message.voice || ctx.message.audio;
   // Tingkatkan durasi ke 10 menit
   if (audioFile.duration > 600) {
-    return ctx.reply("Durasi pesan suara/audio terlalu panjang. Maksimal 10 menit ya.");
+    return ctx.reply("Durasi pesan suara/audio terlalu panjang. Maksimal 10 menit ya 😊");
   }
   const loadingMsg = await ctx.reply(
     "Mendengarkan dan merangkum audio Anda...",
@@ -272,6 +272,6 @@ PENTING: JANGAN gunakan format markdown seperti bintang ganda (**) atau tagar (#
       .catch(() => {});
   }
 });
-bot.launch().then(() => console.log("🚀 Bot Telegram FIKSP Aktif!"));
+bot.launch().then(() => console.log("Bot Telegram FIKSP Aktif!"));
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
