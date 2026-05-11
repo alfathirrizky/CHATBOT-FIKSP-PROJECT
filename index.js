@@ -5,6 +5,7 @@ const path = require("path");
 const axios = require("axios");
 const fs = require("fs");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { YoutubeTranscript } = require("youtube-transcript");
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -54,7 +55,9 @@ bot.start((ctx) => {
       `Fitur yang tersedia:\n` +
       `1. Ketik kata kunci wilayah untuk mencari data di Excel.\n` +
       `2. Ketik /tanya [pertanyaan] untuk mencari info dari dokumen Laporan Monitoring HLM TP2DD Tahun 2025.\n` +
-      `3. Kirim file PDF baru untuk dirangkum otomatis.`,
+      `3. Kirim file PDF baru untuk dirangkum otomatis.\n` +
+      `4. Kirim link YouTube untuk merangkum isi video.\n` +
+      `5. Kirim pesan suara (voice) atau file audio untuk merangkum isinya.`,
   );
 });
 // 2. Fitur Tanya Jawab Dokumen PDF Lokal (Sesuai PDF yang dikirim)
@@ -106,9 +109,41 @@ Berdasarkan dokumen Laporan Monitoring Tindak Lanjut HLM TP2DD Tahun 2025 ini, t
       .catch(() => {});
   }
 });
-// 3. Logika Pencarian Excel (Text Search)
+// 3. Logika Pencarian Excel (Text Search) dan YouTube Link
 bot.on("text", async (ctx) => {
-  const keyword = ctx.message.text.toLowerCase().trim();
+  const text = ctx.message.text.trim();
+  const keyword = text.toLowerCase();
+
+  // Deteksi Link YouTube
+  const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+  if (youtubeRegex.test(text)) {
+    const loadingMsg = await ctx.reply("Mengunduh transkrip YouTube dan merangkum video...");
+    try {
+      const transcript = await YoutubeTranscript.fetchTranscript(text);
+      const transcriptText = transcript.map(t => t.text).join(" ");
+      
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const prompt = `Buatkan rangkuman yang informatif dan terstruktur dalam Bahasa Indonesia dari transkrip video YouTube berikut. Ambil poin-poin penting dan gagasan utamanya.\n\nTranskrip:\n${transcriptText}\n\nPENTING: JANGAN gunakan format markdown seperti bintang ganda (**) atau tagar (#). Gunakan teks biasa saja.`;
+      
+      const result = await model.generateContent(prompt);
+      const summary = result.response.text();
+      const formattedResponse = `RANGKUMAN VIDEO YOUTUBE:\n\n${summary}`;
+      
+      await sendLongMessage(ctx, loadingMsg.message_id, formattedResponse);
+    } catch (error) {
+      console.error("Error processing YouTube link:", error);
+      await ctx.telegram
+        .editMessageText(
+          ctx.chat.id,
+          loadingMsg.message_id,
+          undefined,
+          "Gagal merangkum video YouTube. Pastikan link valid dan video memiliki subtitle/CC (Closed Captions) yang aktif."
+        )
+        .catch(() => {});
+    }
+    return;
+  }
+
   const greetings = ["hi", "halo", "pagi", "siang", "sore", "tes", "p"];
   if (greetings.includes(keyword)) {
     return ctx.reply(
@@ -186,51 +221,50 @@ bot.on("document", async (ctx) => {
       .catch(() => {});
   }
 });
-// 5. Fitur Voice to Summary (Merangkum Pesan Suara)
-bot.on("voice", async (ctx) => {
-  const voice = ctx.message.voice;
-  // Batasi durasi jika perlu (misal max 2 menit agar tidak overload)
-  if (voice.duration > 120) {
-    return ctx.reply("Durasi voice note terlalu panjang. Maksimal 2 menit ya.");
+// 5. Fitur Voice/Audio to Summary (Merangkum Pesan Suara & Audio)
+bot.on(["voice", "audio"], async (ctx) => {
+  const audioFile = ctx.message.voice || ctx.message.audio;
+  // Tingkatkan durasi ke 10 menit
+  if (audioFile.duration > 600) {
+    return ctx.reply("Durasi pesan suara/audio terlalu panjang. Maksimal 10 menit ya.");
   }
   const loadingMsg = await ctx.reply(
-    "Mendengarkan dan merangkum pesan suara Anda...",
+    "Mendengarkan dan merangkum audio Anda...",
   );
   try {
     // 1. Dapatkan link file dari Telegram
-    const fileLink = await ctx.telegram.getFileLink(voice.file_id);
+    const fileLink = await ctx.telegram.getFileLink(audioFile.file_id);
     const url = typeof fileLink === "string" ? fileLink : fileLink.href;
-    // 2. Download file voice (.ogg)
+    // 2. Download file audio
     const response = await axios.get(url, { responseType: "arraybuffer" });
-    const voiceBuffer = Buffer.from(response.data);
-    const voiceBase64 = voiceBuffer.toString("base64");
+    const audioBuffer = Buffer.from(response.data);
+    const audioBase64 = audioBuffer.toString("base64");
     // 3. Gunakan Gemini untuk Merangkum
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    // PERUBAHAN PENTING: Prompt diubah untuk meminta rangkuman
-    const prompt = `Tolong dengarkan pesan suara ini dan buatkan rangkuman intinya dalam Bahasa Indonesia. 
-Jika pesan suaranya panjang, ambil poin-poin utamanya saja.
+    const prompt = `Tolong dengarkan audio ini dan buatkan rangkuman intinya dalam Bahasa Indonesia. 
+Jika ada informasi penting seperti nama, tanggal, angka, atau intruksi, sebutkan dengan jelas. Jika berbentuk percakapan, rangkum topik utamanya.
 PENTING: JANGAN gunakan format markdown seperti bintang ganda (**) atau tagar (#). Gunakan teks biasa saja.`;
     const result = await model.generateContent([
       prompt,
       {
         inlineData: {
-          data: voiceBase64,
-          mimeType: "audio/ogg",
+          data: audioBase64,
+          mimeType: audioFile.mime_type || "audio/ogg",
         },
       },
     ]);
     const summary = result.response.text();
-    const formattedResponse = `RANGKUMAN PESAN SUARA:\n\n${summary}`;
+    const formattedResponse = `RANGKUMAN AUDIO:\n\n${summary}`;
     // 4. Kirim hasil rangkuman
     await sendLongMessage(ctx, loadingMsg.message_id, formattedResponse);
   } catch (error) {
-    console.error("Error Processing Voice:", error);
+    console.error("Error Processing Audio:", error);
     await ctx.telegram
       .editMessageText(
         ctx.chat.id,
         loadingMsg.message_id,
         undefined,
-        "Gagal merangkum pesan suara. Pastikan suara terdengar jelas atau durasinya tidak terlalu pendek.",
+        "Gagal merangkum audio. Pastikan suara terdengar jelas atau durasinya tidak terlalu pendek.",
       )
       .catch(() => {});
   }
