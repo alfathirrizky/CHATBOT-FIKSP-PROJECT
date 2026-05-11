@@ -213,7 +213,7 @@ bot.command('jadwal', (ctx) => {
   const timePart = parts[1];
   const messagePart = parts.slice(2).join(' ');
   
-  const dateStr = `${datePart}T${timePart}:00+07:00`; // Asumsi timezone WIB
+  const dateStr = `${datePart}T${timePart}:00+07:00`;
   const dateObj = new Date(dateStr);
   
   if (isNaN(dateObj.getTime())) {
@@ -304,6 +304,54 @@ bot.on("text", async (ctx) => {
       `Halo ${ctx.from.first_name}, mau cari data apa hari ini?`,
     );
   }
+
+  // Deteksi Laporan Status (Clear/Error) untuk Smart Sticker Responses
+  const isLaporan = keyword.includes("laporan") || keyword.includes("status") || keyword.includes("update");
+  const isClear = keyword.includes("clear") || keyword.includes("aman") || keyword.includes("sukses") || keyword.includes("berhasil") || keyword.includes("selesai");
+  const isError = keyword.includes("error") || keyword.includes("gagal") || keyword.includes("bug") || keyword.includes("panik") || keyword.includes("kendala") || keyword.includes("masalah");
+
+  // Jika laporan sukses (atau ada kata clear dan bukan kalimat pendek biasa)
+  if ((isLaporan && isClear) || (isClear && !isError && text.split(' ').length >= 3)) {
+    // Mengirim emoji yang secara otomatis dirender sebagai animated sticker besar oleh Telegram
+    await ctx.reply("🥳");
+    return ctx.reply("Mantap! Laporan diterima dengan status CLEAR. Kerja bagus! 🎉");
+  }
+
+  // Jika ada laporan error
+  if (isError) {
+    // Mengirim emoji panik yang akan menjadi animated sticker di Telegram
+    await ctx.reply("😱");
+    
+    // Beri jeda sebentar (2 detik) seolah-olah bot sedang panik lalu berpikir
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const loadingMsg = await ctx.reply("Waduh, ada error! Sebentar, saya coba analisis solusi teknisnya...");
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const prompt = `Sebagai asisten IT profesional, berikan saran solusi teknis singkat dan jelas untuk keluhan/masalah berikut: "${text}". Fokus pada langkah perbaikan praktis. Jangan pakai format markdown berlebihan, gunakan teks biasa saja.`;
+      
+      const result = await model.generateContent(prompt);
+      const answer = result.response.text();
+      
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        loadingMsg.message_id,
+        undefined,
+        `💡 *Saran Solusi Teknis:*\n\n${answer}`,
+        { parse_mode: "Markdown" }
+      );
+    } catch (error) {
+      console.error("Error generating tech solution:", error);
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        loadingMsg.message_id,
+        undefined,
+        "Mohon maaf, saya kesulitan memikirkan solusi saat ini. Harap cek kembali log sistem atau dokumentasi Anda ya. 🛠️"
+      );
+    }
+    return;
+  }
+
   const data = readExcelData();
   if (data.length === 0)
     return ctx.reply("Database sedang kosong atau file tidak terbaca.");
