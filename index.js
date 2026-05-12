@@ -4,6 +4,7 @@ const xlsx = require("xlsx");
 const path = require("path");
 const axios = require("axios");
 const fs = require("fs");
+const cheerio = require("cheerio");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { YoutubeTranscript } = require("youtube-transcript");
 const schedule = require("node-schedule");
@@ -130,7 +131,8 @@ bot.start((ctx) => {
       `4. Kirim link YouTube untuk merangkum isi video.\n` +
       `5. Kirim pesan suara (voice) atau file audio untuk merangkum isinya.\n` +
       `6. Ketik /jadwal [YYYY-MM-DD HH:MM] [Kegiatan] untuk membuat pengingat jadwal.\n` +
-      `7. Ketik /listjadwal untuk melihat daftar jadwal Anda.`
+      `7. Ketik /listjadwal untuk melihat daftar jadwal Anda.\n` +
+      `8. Kirim link artikel untuk menganalisa sentimen kontennya.`
   );
 });
 // 2. Fitur Tanya Jawab Dokumen PDF Lokal (Sesuai PDF yang dikirim)
@@ -292,6 +294,60 @@ bot.on("text", async (ctx) => {
           loadingMsg.message_id,
           undefined,
           "Gagal merangkum video YouTube. Pastikan link valid dan video memiliki subtitle/CC (Closed Captions) yang aktif."
+        )
+        .catch(() => {});
+    }
+    return;
+  }
+
+  // Deteksi Link Artikel (Abaikan Instagram)
+  const urlRegex = /(https?:\/\/[^\s]+)/;
+  if (urlRegex.test(text) && !youtubeRegex.test(text)) {
+    const url = text.match(urlRegex)[0];
+    
+    // Fitur analisa sentimen Instagram dinonaktifkan
+    if (url.includes("instagram.com")) {
+      return; 
+    }
+
+    const loadingMsg = await ctx.reply("Membaca tautan dan menganalisa sentimen konten...");
+    try {
+      const userTextContent = text.replace(url, "").trim();
+      let scrapedText = "";
+      
+      // Untuk artikel web biasa
+      try {
+        const res = await axios.get(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" } });
+        const $ = cheerio.load(res.data);
+        const title = $("title").text() || $("meta[property='og:title']").attr("content") || "";
+        const desc = $("meta[property='og:description']").attr("content") || $("meta[name='description']").attr("content") || "";
+        const paragraphs = $("p").map((i, el) => $(el).text()).get().join(" ");
+        scrapedText = title + "\n" + desc + "\n" + paragraphs;
+        scrapedText = scrapedText.replace(/\s+/g, " ").substring(0, 3000); // Batasi 3000 karakter
+        
+        if (userTextContent) {
+          scrapedText = "Catatan Pengguna: " + userTextContent + "\n\nIsi Artikel:\n" + scrapedText;
+        }
+      } catch (webErr) {
+        scrapedText = "Tautan Web: " + url + "\nCatatan Pengguna: " + userTextContent;
+      }
+
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const prompt = `Analisa sentimen dari konten berikut. Tentukan apakah sentimennya Positif, Negatif, atau Netral. Berikan juga ringkasan alasan mengapa Anda menyimpulkan sentimen tersebut beserta poin-poin utama dari kontennya.\n\nTautan/Konten: ${url}\n\nTeks yang dapat diekstrak:\n${scrapedText}\n\nPENTING: Jika teks yang diekstrak terlalu sedikit dan Anda tidak tahu isinya, jangan mengarang. Katakan saja data tidak cukup. JANGAN gunakan format markdown seperti bintang ganda (**) atau tagar (#). Gunakan teks biasa saja.`;
+      
+      const result = await model.generateContent(prompt);
+      const sentimentAnalysis = result.response.text();
+      const formattedResponse = `ANALISA SENTIMEN TAUTAN:\n\n${sentimentAnalysis}`;
+      
+      await sendLongMessage(ctx, loadingMsg.message_id, formattedResponse);
+    } catch (error) {
+      console.error("Error processing URL link:", error);
+      await ctx.telegram
+        .editMessageText(
+          ctx.chat.id,
+          loadingMsg.message_id,
+          undefined,
+          "Gagal menganalisa sentimen tautan. Pastikan tautan dapat diakses publik atau coba lagi nanti."
         )
         .catch(() => {});
     }
