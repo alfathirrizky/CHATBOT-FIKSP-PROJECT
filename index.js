@@ -300,40 +300,50 @@ bot.on("text", async (ctx) => {
     return;
   }
 
-  // Deteksi Link Artikel (Abaikan Instagram)
+  // Deteksi Link Artikel & Instagram
   const urlRegex = /(https?:\/\/[^\s]+)/;
   if (urlRegex.test(text) && !youtubeRegex.test(text)) {
     const url = text.match(urlRegex)[0];
     
-    // Fitur analisa sentimen Instagram dinonaktifkan
-    if (url.includes("instagram.com")) {
-      return; 
-    }
-
     const loadingMsg = await ctx.reply("Membaca tautan dan menganalisa sentimen konten...");
     try {
       const userTextContent = text.replace(url, "").trim();
       let scrapedText = "";
       
-      // Untuk artikel web biasa
-      try {
-        const res = await axios.get(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" } });
-        const $ = cheerio.load(res.data);
-        const title = $("title").text() || $("meta[property='og:title']").attr("content") || "";
-        const desc = $("meta[property='og:description']").attr("content") || $("meta[name='description']").attr("content") || "";
-        const paragraphs = $("p").map((i, el) => $(el).text()).get().join(" ");
-        scrapedText = title + "\n" + desc + "\n" + paragraphs;
-        scrapedText = scrapedText.replace(/\s+/g, " ").substring(0, 3000); // Batasi 3000 karakter
-        
-        if (userTextContent) {
-          scrapedText = "Catatan Pengguna: " + userTextContent + "\n\nIsi Artikel:\n" + scrapedText;
+      if (url.includes("instagram.com")) {
+        // Jangan scrape instagram menggunakan axios karena akan diblokir
+        if (!userTextContent) {
+          await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            loadingMsg.message_id,
+            undefined,
+            "Mohon maaf, sistem bot tidak dapat menarik teks dari link Instagram secara otomatis karena proteksi keamanan dari pihak Instagram.\n\n💡 *Solusi:* Silakan salin (copy) caption atau teks postingan tersebut dan kirimkan bersamaan dengan linknya untuk dianalisis.",
+            { parse_mode: "Markdown" }
+          ).catch(() => {});
+          return;
         }
-      } catch (webErr) {
-        scrapedText = "Tautan Web: " + url + "\nCatatan Pengguna: " + userTextContent;
+        scrapedText = "Catatan Pengguna / Caption: " + userTextContent;
+      } else {
+        // Untuk artikel web biasa
+        try {t 
+          const res = await axios.get(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" } });
+          const $ = cheerio.load(res.data);
+          const title = $("title").text() || $("meta[property='og:title']").attr("content") || "";
+          const desc = $("meta[property='og:description']").attr("content") || $("meta[name='description']").attr("content") || "";
+          const paragraphs = $("p").map((i, el) => $(el).text()).get().join(" ");
+          scrapedText = title + "\n" + desc + "\n" + paragraphs;
+          scrapedText = scrapedText.replace(/\s+/g, " ").substring(0, 3000); // Batasi 3000 karakter
+          
+          if (userTextContent) {
+            scrapedText = "Catatan Pengguna: " + userTextContent + "\n\nIsi Artikel:\n" + scrapedText;
+          }
+        } catch (webErr) {
+          scrapedText = "Tautan Web: " + url + "\nCatatan Pengguna: " + userTextContent;
+        }
       }
 
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      const prompt = `Analisa sentimen dari konten berikut. Tentukan apakah sentimennya Positif, Negatif, atau Netral. Berikan juga ringkasan alasan mengapa Anda menyimpulkan sentimen tersebut beserta poin-poin utama dari kontennya.\n\nTautan/Konten: ${url}\n\nTeks yang dapat diekstrak:\n${scrapedText}\n\nPENTING: Jika teks yang diekstrak terlalu sedikit dan Anda tidak tahu isinya, jangan mengarang. Katakan saja data tidak cukup. JANGAN gunakan format markdown seperti bintang ganda (**) atau tagar (#). Gunakan teks biasa saja.`;
+      const prompt = `Analisa sentimen dari konten berikut. Tentukan apakah sentimennya Positif, Negatif, atau Netral. Berikan juga ringkasan alasan mengapa Anda menyimpulkan sentimen tersebut beserta poin-poin utama dari kontennya.\n\nTautan/Konten: ${url}\n\nTeks yang dapat diekstrak:\n${scrapedText}\n\nPENTING: Jika teks yang diekstrak terlalu sedikit dan Anda tidak tahu isinya dari tautan tersebut, jangan mengarang. Katakan saja data tidak cukup dan minta pengguna untuk menyertakan teks caption. JANGAN gunakan format markdown seperti bintang ganda (**) atau tagar (#). Gunakan teks biasa saja.`;
       
       const result = await model.generateContent(prompt);
       const sentimentAnalysis = result.response.text();

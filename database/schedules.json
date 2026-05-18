@@ -12,33 +12,5 @@
     "displayDate": "2026-05-20 14:00",
     "message": "Rapat koordinasi tim",
     "chatId": 1234921774
-  },
-  {
-    "id": "1778482484163",
-    "dateStr": "2026-05-12T02:30:00.000Z",
-    "displayDate": "2026-05-12 09:30",
-    "message": "- Rapat triwulan",
-    "chatId": 1234921774
-  },
-  {
-    "id": "1778482706820",
-    "dateStr": "2026-05-12T07:00:00.000Z",
-    "displayDate": "2026-05-12 14:00",
-    "message": "Rapat Tim https://zoom.us/j/123456789",
-    "chatId": 1234921774
-  },
-  {
-    "id": "1778491368384",
-    "dateStr": "2026-05-12T09:23:00.000Z",
-    "displayDate": "2026-05-12 16:23",
-    "message": "Rapat Tim https://zoom.us/j/123456789",
-    "chatId": 1234921774
-  },
-  {
-    "id": "1778546282401",
-    "dateStr": "2026-05-12T00:39:00.000Z",
-    "displayDate": "2026-05-12 07:39",
-    "message": "rapat TP2DD",
-    "chatId": 6120959707
   }
 ]
