@@ -265,6 +265,13 @@ bot.command('listjadwal', (ctx) => {
   ctx.replyWithMarkdown(msg);
 });
 
+// Fungsi Helper untuk mengekstrak Video ID YouTube dari berbagai format tautan
+function extractYoutubeId(url) {
+  const regExp = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/|shorts\/|live\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[1].length === 11) ? match[1] : null;
+}
+
 // 3. Logika Pencarian Excel (Text Search) dan YouTube Link
 bot.on("text", async (ctx) => {
   const text = ctx.message.text.trim();
@@ -275,7 +282,11 @@ bot.on("text", async (ctx) => {
   if (youtubeRegex.test(text)) {
     const loadingMsg = await ctx.reply("Mengunduh transkrip YouTube dan merangkum video...");
     try {
-      const transcript = await YoutubeTranscript.fetchTranscript(text);
+      const videoId = extractYoutubeId(text);
+      if (!videoId) {
+        throw new Error("ID Video YouTube tidak ditemukan dalam tautan.");
+      }
+      const transcript = await YoutubeTranscript.fetchTranscript(videoId);
       const transcriptText = transcript.map(t => t.text).join(" ");
       
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -325,7 +336,7 @@ bot.on("text", async (ctx) => {
         scrapedText = "Catatan Pengguna / Caption: " + userTextContent;
       } else {
         // Untuk artikel web biasa
-        try {t 
+        try {
           const res = await axios.get(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" } });
           const $ = cheerio.load(res.data);
           const title = $("title").text() || $("meta[property='og:title']").attr("content") || "";

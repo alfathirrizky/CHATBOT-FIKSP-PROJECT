@@ -12,5 +12,12 @@
     "displayDate": "2026-05-20 14:00",
     "message": "Rapat koordinasi tim",
     "chatId": 1234921774
+  },
+  {
+    "id": "1779178272413",
+    "dateStr": "2026-05-20T08:10:00.000Z",
+    "displayDate": "2026-05-20 15:10",
+    "message": "Kegiatan test",
+    "chatId": 1234921774
   }
 ]
